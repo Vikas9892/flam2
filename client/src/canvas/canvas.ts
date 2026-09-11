@@ -1,6 +1,7 @@
 import { ToolType, StrokeStyle, DrawingStroke, FreehandStroke, ShapeStroke, Point } from "../types";
 import { Viewport } from "./viewport";
 import { renderStroke, clearLayer } from "./renderer";
+import { PerformanceProfiler } from "./perf";
 
 export interface CanvasCallbacks {
   onStrokeStart?: (stroke: DrawingStroke) => void;
@@ -363,6 +364,7 @@ export class CanvasEngine {
   }
 
   private renderActiveLayer(): void {
+    const t0 = PerformanceProfiler.startMeasure();
     clearLayer(this.activeCanvas, this.activeCtx, this.viewport);
 
     // Render remote in-flight strokes
@@ -374,6 +376,7 @@ export class CanvasEngine {
     if (this.localStroke) {
       renderStroke(this.activeCtx, this.localStroke);
     }
+    PerformanceProfiler.endMeasure(t0, "active-canvas");
   }
 
   public getCommittedStrokes(): DrawingStroke[] {
