@@ -8,6 +8,9 @@ import {
   JoinRoomPayload,
   isValidRoomId,
   isValidUserName,
+  isValidHexColor,
+  isValidStrokeWidth,
+  isValidPointTuple,
   PingPayload,
   PongPayload
 } from "./protocol.js";
@@ -78,6 +81,53 @@ io.on("connection", (socket) => {
 
     // Broadcast presence update to other peers in the room
     socket.to(room.id).emit("presence:user-joined", { user });
+  });
+
+  // Transient stroke streaming
+  socket.on("stroke:start", (payload: any) => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    if (
+      !payload ||
+      typeof payload.strokeId !== "string" ||
+      !["brush", "eraser", "line", "rectangle", "circle"].includes(payload.tool) ||
+      !isValidHexColor(payload.color) ||
+      !isValidStrokeWidth(payload.width) ||
+      !isValidPointTuple(payload.point)
+    ) {
+      return;
+    }
+
+    socket.to(room.id).emit("stroke:start", payload);
+  });
+
+  socket.on("stroke:points", (payload: any) => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    if (
+      !payload ||
+      typeof payload.strokeId !== "string" ||
+      !Array.isArray(payload.points) ||
+      payload.points.length > 200 ||
+      !payload.points.every(isValidPointTuple)
+    ) {
+      return;
+    }
+
+    socket.to(room.id).emit("stroke:points", payload);
+  });
+
+  socket.on("stroke:end", (payload: any) => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    if (!payload || typeof payload.strokeId !== "string") {
+      return;
+    }
+
+    socket.to(room.id).emit("stroke:end", payload);
   });
 
   // Disconnect handler

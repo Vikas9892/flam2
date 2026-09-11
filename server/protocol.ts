@@ -41,6 +41,26 @@ export interface PongPayload {
   serverTime: number;
 }
 
+// In-flight stroke streaming payloads
+export type PointTuple = [number, number];
+
+export interface StrokeStartPayload {
+  strokeId: string;
+  tool: "brush" | "eraser" | "line" | "rectangle" | "circle";
+  color: string;
+  width: number;
+  point: PointTuple;
+}
+
+export interface StrokePointsPayload {
+  strokeId: string;
+  points: PointTuple[];
+}
+
+export interface StrokeEndPayload {
+  strokeId: string;
+}
+
 // Input validation helpers
 export function isValidRoomId(roomId: unknown): roomId is string {
   return typeof roomId === "string" && roomId.trim().length > 0 && roomId.length <= 64;
@@ -52,4 +72,21 @@ export function isValidUserName(name: unknown): name is string {
 
 export function isValidCoordinate(n: unknown): n is number {
   return typeof n === "number" && !isNaN(n) && isFinite(n) && Math.abs(n) < 1e7;
+}
+
+export function isValidStrokeWidth(w: unknown): w is number {
+  return typeof w === "number" && !isNaN(w) && isFinite(w) && w >= 1 && w <= 100;
+}
+
+export function isValidHexColor(c: unknown): c is string {
+  return typeof c === "string" && /^#[0-9a-fA-F]{6}$/.test(c);
+}
+
+export function isValidPointTuple(p: unknown): p is PointTuple {
+  return (
+    Array.isArray(p) &&
+    p.length === 2 &&
+    isValidCoordinate(p[0]) &&
+    isValidCoordinate(p[1])
+  );
 }

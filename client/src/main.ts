@@ -6,6 +6,7 @@ import { PerformanceHUD } from "./ui/performance-panel";
 import { setupKeyboardShortcuts } from "./ui/keyboard";
 import { showToast } from "./ui/toast";
 import { SocketClient } from "./collaboration/socket";
+import { FreehandStroke, ShapeStroke } from "./types";
 
 // Parse or generate room ID
 const urlParams = new URLSearchParams(window.location.search);
@@ -26,8 +27,18 @@ if (!appEl || !container) {
 // 1. Performance HUD
 export const perfHud = new PerformanceHUD();
 
-// 2. Canvas Engine
-export const canvasEngine = new CanvasEngine(container);
+// 2. Canvas Engine with collaboration callbacks
+export const canvasEngine = new CanvasEngine(container, {
+  onStrokeStart: (stroke) => {
+    socketClient.emitStrokeStart(stroke);
+  },
+  onStrokePoints: (strokeId, points) => {
+    socketClient.emitStrokePoints(strokeId, points);
+  },
+  onStrokeEnd: (stroke) => {
+    socketClient.emitStrokeEnd(stroke.id);
+  }
+});
 
 // 3. Top Bar
 export const topBar = new TopBar(appEl, roomId, "Design Sprint", (newName) => {
@@ -108,8 +119,60 @@ export const socketClient = new SocketClient(roomId, {
     );
     perfHud.setUsersCount(all.length);
   },
+  onRemoteStrokeStart: (payload) => {
+    const startPoint = { x: payload.point[0], y: payload.point[1] };
+    if (payload.tool === "brush" || payload.tool === "eraser") {
+      const stroke: FreehandStroke = {
+        id: payload.strokeId,
+        userId: "remote",
+        tool: payload.tool,
+        style: { color: payload.color, width: payload.width },
+        points: [startPoint]
+      };
+      canvasEngine.updateRemoteActiveStroke(stroke);
+    } else {
+      const stroke: ShapeStroke = {
+        id: payload.strokeId,
+        userId: "remote",
+        tool: payload.tool,
+        style: { color: payload.color, width: payload.width },
+        startPoint,
+        endPoint: startPoint
+      };
+      canvasEngine.updateRemoteActiveStroke(stroke);
+    }
+  },
+  onRemoteStrokePoints: (payload) => {
+    const existing = canvasEngine.getRemoteActiveStroke(payload.strokeId);
+    if (!existing) return;
+
+    if (existing.tool === "brush" || existing.tool === "eraser") {
+      const freehand = existing as FreehandStroke;
+      payload.points.forEach((pt) => {
+        freehand.points.push({ x: pt[0], y: pt[1] });
+      });
+      canvasEngine.updateRemoteActiveStroke(freehand);
+    } else {
+      const shape = existing as ShapeStroke;
+      const lastPoint = payload.points[payload.points.length - 1];
+      if (lastPoint) {
+        shape.endPoint = { x: lastPoint[0], y: lastPoint[1] };
+        canvasEngine.updateRemoteActiveStroke(shape);
+      }
+    }
+  },
+  onRemoteStrokeEnd: (payload) => {
+    const existing = canvasEngine.getRemoteActiveStroke(payload.strokeId);
+    if (existing) {
+      canvasEngine.removeRemoteActiveStroke(payload.strokeId);
+      canvasEngine.commitStroke(existing);
+    }
+  },
   onError: (msg) => {
     showToast(`Error: ${msg}`);
+  },
+  onMessageReceived: () => {
+    perfHud.recordMessage();
   }
 });
 
@@ -129,4 +192,4 @@ setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   socketClient: SocketClient;
 }).socketClient = socketClient;
 
-console.log("[CanvasFlow] Room collaboration wired.");
+console.log("[CanvasFlow] Real-time stroke collaboration wired.");

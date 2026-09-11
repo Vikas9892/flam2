@@ -1,5 +1,15 @@
 import { io, Socket } from "socket.io-client";
-import { UserInfo, RoomStatePayload, UserJoinedPayload, UserLeftPayload, PongPayload } from "../../../server/protocol";
+import {
+  UserInfo,
+  RoomStatePayload,
+  UserJoinedPayload,
+  UserLeftPayload,
+  PongPayload,
+  StrokeStartPayload,
+  StrokePointsPayload,
+  StrokeEndPayload
+} from "../../../server/protocol";
+import { DrawingStroke, Point, FreehandStroke, ShapeStroke } from "../types";
 
 export interface SocketClientCallbacks {
   onStatusChange?: (status: "connected" | "reconnecting" | "offline" | "connecting") => void;
@@ -7,7 +17,11 @@ export interface SocketClientCallbacks {
   onRoomState?: (state: RoomStatePayload) => void;
   onUserJoined?: (user: UserInfo) => void;
   onUserLeft?: (userId: string) => void;
+  onRemoteStrokeStart?: (payload: StrokeStartPayload) => void;
+  onRemoteStrokePoints?: (payload: StrokePointsPayload) => void;
+  onRemoteStrokeEnd?: (payload: StrokeEndPayload) => void;
   onError?: (err: string) => void;
+  onMessageReceived?: () => void;
 }
 
 export class SocketClient {
@@ -18,6 +32,10 @@ export class SocketClient {
 
   private callbacks: SocketClientCallbacks;
   private pingInterval: number | null = null;
+
+  // Stroke point batch buffer
+  private pointBatchBuffer: Map<string, Point[]> = new Map();
+  private batchFlushTimer: number | null = null;
 
   constructor(roomId: string, callbacks: SocketClientCallbacks = {}) {
     this.currentRoomId = roomId;
@@ -58,6 +76,7 @@ export class SocketClient {
     });
 
     this.socket.on("room:state", (payload: RoomStatePayload) => {
+      this.callbacks.onMessageReceived?.();
       this.currentUser = payload.self;
       this.participants.clear();
       payload.participants.forEach((p) => {
@@ -67,16 +86,34 @@ export class SocketClient {
     });
 
     this.socket.on("presence:user-joined", (payload: UserJoinedPayload) => {
+      this.callbacks.onMessageReceived?.();
       this.participants.set(payload.user.userId, payload.user);
       this.callbacks.onUserJoined?.(payload.user);
     });
 
     this.socket.on("presence:user-left", (payload: UserLeftPayload) => {
+      this.callbacks.onMessageReceived?.();
       this.participants.delete(payload.userId);
       this.callbacks.onUserLeft?.(payload.userId);
     });
 
+    this.socket.on("stroke:start", (payload: StrokeStartPayload) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRemoteStrokeStart?.(payload);
+    });
+
+    this.socket.on("stroke:points", (payload: StrokePointsPayload) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRemoteStrokePoints?.(payload);
+    });
+
+    this.socket.on("stroke:end", (payload: StrokeEndPayload) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRemoteStrokeEnd?.(payload);
+    });
+
     this.socket.on("connection:pong", (payload: PongPayload) => {
+      this.callbacks.onMessageReceived?.();
       const latency = Math.max(0, Date.now() - payload.clientTime);
       this.callbacks.onLatencyUpdate?.(latency);
     });
@@ -92,6 +129,65 @@ export class SocketClient {
       roomId,
       user: requestedName ? { name: requestedName } : undefined
     });
+  }
+
+  public emitStrokeStart(stroke: DrawingStroke): void {
+    let startPoint: Point;
+    if (stroke.tool === "brush" || stroke.tool === "eraser") {
+      startPoint = (stroke as FreehandStroke).points[0];
+    } else {
+      startPoint = (stroke as ShapeStroke).startPoint;
+    }
+
+    if (!startPoint) return;
+
+    const payload: StrokeStartPayload = {
+      strokeId: stroke.id,
+      tool: stroke.tool,
+      color: stroke.style.color,
+      width: stroke.style.width,
+      point: [startPoint.x, startPoint.y]
+    };
+
+    this.socket.emit("stroke:start", payload);
+  }
+
+  public emitStrokePoints(strokeId: string, points: Point[]): void {
+    let buffer = this.pointBatchBuffer.get(strokeId);
+    if (!buffer) {
+      buffer = [];
+      this.pointBatchBuffer.set(strokeId, buffer);
+    }
+    buffer.push(...points);
+
+    // Schedule batch flush every ~30ms (approx 33 fps network updates)
+    if (!this.batchFlushTimer) {
+      this.batchFlushTimer = window.setTimeout(() => {
+        this.flushPointBatches();
+      }, 30);
+    }
+  }
+
+  private flushPointBatches(): void {
+    this.batchFlushTimer = null;
+    for (const [strokeId, points] of this.pointBatchBuffer.entries()) {
+      if (points.length > 0) {
+        const payload: StrokePointsPayload = {
+          strokeId,
+          points: points.map((p) => [p.x, p.y])
+        };
+        this.socket.emit("stroke:points", payload);
+      }
+    }
+    this.pointBatchBuffer.clear();
+  }
+
+  public emitStrokeEnd(strokeId: string): void {
+    // Flush any pending points first
+    this.flushPointBatches();
+
+    const payload: StrokeEndPayload = { strokeId };
+    this.socket.emit("stroke:end", payload);
   }
 
   private startPing(): void {

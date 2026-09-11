@@ -335,6 +335,10 @@ export class CanvasEngine {
     this.requestActiveRender();
   }
 
+  public getRemoteActiveStroke(strokeId: string): DrawingStroke | undefined {
+    return this.remoteActiveStrokes.get(strokeId);
+  }
+
   public removeRemoteActiveStroke(strokeId: string): void {
     this.remoteActiveStrokes.delete(strokeId);
     this.requestActiveRender();
