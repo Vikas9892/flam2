@@ -227,6 +227,18 @@ export class SocketClient {
     }
   }
 
+  public undo(): void {
+    if (this.socket.connected) {
+      this.socket.emit("history:undo");
+    }
+  }
+
+  public redo(): void {
+    if (this.socket.connected) {
+      this.socket.emit("history:redo");
+    }
+  }
+
   private startPing(): void {
     this.stopPing();
     this.pingInterval = window.setInterval(() => {

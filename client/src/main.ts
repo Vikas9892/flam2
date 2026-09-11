@@ -68,10 +68,10 @@ export const toolbar = new Toolbar(container, canvasEngine);
 // 7. Bottom Controls Bar
 export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   onUndo: () => {
-    console.log("[CanvasFlow] Undo requested");
+    socketClient.undo();
   },
   onRedo: () => {
-    console.log("[CanvasFlow] Redo requested");
+    socketClient.redo();
   },
   onClear: () => {
     if (confirm("Clear all drawings on the canvas?")) {
@@ -215,8 +215,8 @@ export const socketClient = new SocketClient(roomId, {
 
 // 9. Keyboard Shortcuts
 setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
-  onUndo: () => console.log("[CanvasFlow] Undo requested"),
-  onRedo: () => console.log("[CanvasFlow] Redo requested")
+  onUndo: () => socketClient.undo(),
+  onRedo: () => socketClient.redo()
 });
 
 // Window debug handles

@@ -160,6 +160,50 @@ io.on("connection", (socket) => {
     io.to(room.id).emit("operation:commit", { operation });
   });
 
+  // Global synchronized undo
+  socket.on("history:undo", () => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    const targetOp = room.history.findLatestActiveDrawable();
+    if (!targetOp) return;
+
+    room.revision++;
+    const undoOp: any = {
+      id: "undo_" + Math.random().toString(36).substring(2, 9),
+      revision: room.revision,
+      authorId: socket.id,
+      type: "undo",
+      payload: { targetOperationId: targetOp.id },
+      timestamp: Date.now()
+    };
+
+    room.history.addOperation(undoOp);
+    io.to(room.id).emit("operation:commit", { operation: undoOp });
+  });
+
+  // Global synchronized redo
+  socket.on("history:redo", () => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    const targetId = room.history.popRedoCandidate();
+    if (!targetId) return;
+
+    room.revision++;
+    const redoOp: any = {
+      id: "redo_" + Math.random().toString(36).substring(2, 9),
+      revision: room.revision,
+      authorId: socket.id,
+      type: "redo",
+      payload: { targetOperationId: targetId },
+      timestamp: Date.now()
+    };
+
+    room.history.addOperation(redoOp);
+    io.to(room.id).emit("operation:commit", { operation: redoOp });
+  });
+
   // Ephemeral live cursor presence with rate limiting (~25 updates/sec)
   const cursorRateLimit = new Map<string, number>();
 
