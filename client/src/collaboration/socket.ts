@@ -15,6 +15,8 @@ export interface SocketClientCallbacks {
   onStatusChange?: (status: "connected" | "reconnecting" | "offline" | "connecting") => void;
   onLatencyUpdate?: (ms: number) => void;
   onRoomState?: (state: RoomStatePayload) => void;
+  onRoomDelta?: (delta: any) => void;
+  onRoomSnapshot?: (snapshot: any) => void;
   onUserJoined?: (user: UserInfo) => void;
   onUserLeft?: (userId: string) => void;
   onRemoteStrokeStart?: (payload: StrokeStartPayload) => void;
@@ -74,7 +76,7 @@ export class SocketClient {
 
     this.socket.io.on("reconnect", () => {
       this.callbacks.onStatusChange?.("connected");
-      this.joinRoom(this.currentRoomId);
+      this.resumeRoom(this.currentRoomId, this.lastKnownRevision);
     });
 
     this.socket.on("room:state", (payload: RoomStatePayload) => {
@@ -85,6 +87,16 @@ export class SocketClient {
         this.participants.set(p.userId, p);
       });
       this.callbacks.onRoomState?.(payload);
+    });
+
+    this.socket.on("room:delta", (payload: any) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRoomDelta?.(payload);
+    });
+
+    this.socket.on("room:snapshot", (payload: any) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRoomSnapshot?.(payload);
     });
 
     this.socket.on("presence:user-joined", (payload: UserJoinedPayload) => {
@@ -137,11 +149,21 @@ export class SocketClient {
     });
   }
 
+  public lastKnownRevision: number = 0;
+
   public joinRoom(roomId: string, requestedName?: string): void {
     this.currentRoomId = roomId;
     this.socket.emit("room:join", {
       roomId,
       user: requestedName ? { name: requestedName } : undefined
+    });
+  }
+
+  public resumeRoom(roomId: string, lastAppliedRevision: number): void {
+    this.currentRoomId = roomId;
+    this.socket.emit("room:resume", {
+      roomId,
+      lastAppliedRevision
     });
   }
 

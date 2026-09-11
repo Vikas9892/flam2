@@ -107,6 +107,7 @@ export const socketClient = new SocketClient(roomId, {
     // Synchronize history and active strokes
     if (Array.isArray(state.operations)) {
       clientHistory.setOperations(state.operations);
+      socketClient.lastKnownRevision = clientHistory.lastAppliedRevision;
       canvasEngine.setCommittedStrokes(clientHistory.getActiveStrokes());
       perfHud.setOpsCount(clientHistory.getAllOperations().length);
       bottomBar.setHistoryState(clientHistory.canUndo(), clientHistory.canRedo());
@@ -117,6 +118,28 @@ export const socketClient = new SocketClient(roomId, {
       toolbar.setColor(state.self.color);
     }
     showToast(`Joined room #${state.roomId} as ${state.self.name}`);
+  },
+  onRoomDelta: (delta) => {
+    if (Array.isArray(delta.operations)) {
+      for (const op of delta.operations) {
+        clientHistory.applyOperation(op);
+      }
+      socketClient.lastKnownRevision = clientHistory.lastAppliedRevision;
+      canvasEngine.setCommittedStrokes(clientHistory.getActiveStrokes());
+      perfHud.setOpsCount(clientHistory.getAllOperations().length);
+      bottomBar.setHistoryState(clientHistory.canUndo(), clientHistory.canRedo());
+      showToast(`Reconnected! Synced ${delta.operations.length} missed operations.`);
+    }
+  },
+  onRoomSnapshot: (snapshot) => {
+    if (Array.isArray(snapshot.operations)) {
+      clientHistory.setOperations(snapshot.operations);
+      socketClient.lastKnownRevision = clientHistory.lastAppliedRevision;
+      canvasEngine.setCommittedStrokes(clientHistory.getActiveStrokes());
+      perfHud.setOpsCount(clientHistory.getAllOperations().length);
+      bottomBar.setHistoryState(clientHistory.canUndo(), clientHistory.canRedo());
+      showToast("Reconnected! Synced room snapshot.");
+    }
   },
   onUserJoined: (user) => {
     showToast(`${user.name} joined the room`);

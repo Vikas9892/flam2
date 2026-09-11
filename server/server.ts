@@ -86,6 +86,43 @@ io.on("connection", (socket) => {
     socket.to(room.id).emit("presence:user-joined", { user });
   });
 
+  // Reconnection recovery via room:resume
+  socket.on("room:resume", (payload: any) => {
+    if (!payload || !isValidRoomId(payload.roomId)) {
+      socket.emit("room:error", { message: "Invalid room ID" });
+      return;
+    }
+
+    const lastApplied = typeof payload.lastAppliedRevision === "number" && payload.lastAppliedRevision >= 0
+      ? payload.lastAppliedRevision
+      : 0;
+
+    const requestedName = isValidUserName(payload.user?.name) ? payload.user.name : undefined;
+    const { room, user } = roomManager.joinRoom(payload.roomId, socket.id, requestedName);
+
+    socket.join(room.id);
+
+    // Broadcast user presence
+    socket.to(room.id).emit("presence:user-joined", { user });
+
+    const delta = room.revision - lastApplied;
+    if (delta <= 100 && lastApplied <= room.revision) {
+      // Send delta operations
+      const deltaOps = room.history.getOperationsFrom(lastApplied);
+      socket.emit("room:delta", {
+        fromRevision: lastApplied,
+        toRevision: room.revision,
+        operations: deltaOps
+      });
+    } else {
+      // Delta too large or unknown revision: send full snapshot
+      socket.emit("room:snapshot", {
+        revision: room.revision,
+        operations: room.history.getOperations()
+      });
+    }
+  });
+
   // Transient stroke streaming
   socket.on("stroke:start", (payload: any) => {
     const room = roomManager.getRoomForUser(socket.id);

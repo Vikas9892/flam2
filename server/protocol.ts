@@ -85,6 +85,25 @@ export interface OperationCommitPayload {
   operation: Operation;
 }
 
+export interface RoomResumePayload {
+  roomId: string;
+  lastAppliedRevision: number;
+  user?: {
+    name?: string;
+  };
+}
+
+export interface RoomDeltaPayload {
+  fromRevision: number;
+  toRevision: number;
+  operations: Operation[];
+}
+
+export interface RoomSnapshotPayload {
+  revision: number;
+  operations: Operation[];
+}
+
 export interface UserJoinedPayload {
   user: UserInfo;
 }
