@@ -9,6 +9,7 @@ import { SocketClient } from "./collaboration/socket";
 import { PresenceManager } from "./collaboration/presence";
 import { ClientHistory } from "./state/history";
 import { FreehandStroke, ShapeStroke } from "./types";
+import { exportCanvasAsPng } from "./canvas/export";
 
 // Parse or generate room ID
 const urlParams = new URLSearchParams(window.location.search);
@@ -80,7 +81,7 @@ export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
     }
   },
   onExport: () => {
-    showToast("Preparing export...");
+    exportCanvasAsPng(canvasEngine.getCommittedStrokes(), roomId);
   }
 });
 
