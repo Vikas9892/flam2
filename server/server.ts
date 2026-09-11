@@ -3,6 +3,14 @@ import http from "http";
 import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
+import { roomManager } from "./rooms.js";
+import {
+  JoinRoomPayload,
+  isValidRoomId,
+  isValidUserName,
+  PingPayload,
+  PongPayload
+} from "./protocol.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,10 +45,47 @@ app.get("*", (_req, res, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(`[Socket] Client connected: ${socket.id}`);
+  // Latency ping/pong
+  socket.on("connection:ping", (payload: PingPayload) => {
+    if (typeof payload?.clientTime === "number") {
+      const pong: PongPayload = {
+        clientTime: payload.clientTime,
+        serverTime: Date.now()
+      };
+      socket.emit("connection:pong", pong);
+    }
+  });
 
+  // Room join
+  socket.on("room:join", (payload: JoinRoomPayload) => {
+    if (!payload || !isValidRoomId(payload.roomId)) {
+      socket.emit("room:error", { message: "Invalid room ID" });
+      return;
+    }
+
+    const requestedName = isValidUserName(payload.user?.name) ? payload.user.name : undefined;
+    const { room, user } = roomManager.joinRoom(payload.roomId, socket.id, requestedName);
+
+    socket.join(room.id);
+
+    // Send initial room state to the joining user
+    socket.emit("room:state", {
+      roomId: room.id,
+      self: user,
+      participants: room.getParticipants(),
+      revision: room.revision
+    });
+
+    // Broadcast presence update to other peers in the room
+    socket.to(room.id).emit("presence:user-joined", { user });
+  });
+
+  // Disconnect handler
   socket.on("disconnect", () => {
-    console.log(`[Socket] Client disconnected: ${socket.id}`);
+    const { room, user } = roomManager.leaveRoom(socket.id);
+    if (room && user) {
+      socket.to(room.id).emit("presence:user-left", { userId: user.userId });
+    }
   });
 });
 

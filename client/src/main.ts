@@ -5,6 +5,7 @@ import { BottomBar } from "./ui/bottombar";
 import { PerformanceHUD } from "./ui/performance-panel";
 import { setupKeyboardShortcuts } from "./ui/keyboard";
 import { showToast } from "./ui/toast";
+import { SocketClient } from "./collaboration/socket";
 
 // Parse or generate room ID
 const urlParams = new URLSearchParams(window.location.search);
@@ -56,7 +57,63 @@ export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   }
 });
 
-// 6. Keyboard Shortcuts
+// 6. Socket Collaboration Client
+export const socketClient = new SocketClient(roomId, {
+  onStatusChange: (status) => {
+    topBar.setConnectionStatus(status);
+  },
+  onLatencyUpdate: (ms) => {
+    topBar.setLatency(ms);
+    perfHud.setLatency(ms);
+  },
+  onRoomState: (state) => {
+    topBar.updateParticipants(
+      state.participants.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        color: p.color,
+        isSelf: p.userId === state.self.userId
+      }))
+    );
+    perfHud.setUsersCount(state.participants.length);
+
+    // Adopt assigned color for local user
+    if (state.self.color) {
+      toolbar.setColor(state.self.color);
+    }
+    showToast(`Joined room #${state.roomId} as ${state.self.name}`);
+  },
+  onUserJoined: (user) => {
+    showToast(`${user.name} joined the room`);
+    const all = socketClient.getParticipantsList();
+    topBar.updateParticipants(
+      all.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        color: p.color,
+        isSelf: p.userId === socketClient.currentUser?.userId
+      }))
+    );
+    perfHud.setUsersCount(all.length);
+  },
+  onUserLeft: (_userId) => {
+    const all = socketClient.getParticipantsList();
+    topBar.updateParticipants(
+      all.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        color: p.color,
+        isSelf: p.userId === socketClient.currentUser?.userId
+      }))
+    );
+    perfHud.setUsersCount(all.length);
+  },
+  onError: (msg) => {
+    showToast(`Error: ${msg}`);
+  }
+});
+
+// 7. Keyboard Shortcuts
 setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   onUndo: () => console.log("[CanvasFlow] Undo requested"),
   onRedo: () => console.log("[CanvasFlow] Redo requested")
@@ -69,6 +126,7 @@ setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   toolbar: Toolbar;
   bottomBar: BottomBar;
   perfHud: PerformanceHUD;
-}).canvasEngine = canvasEngine;
+  socketClient: SocketClient;
+}).socketClient = socketClient;
 
-console.log("[CanvasFlow] Workspace UI initialized.");
+console.log("[CanvasFlow] Room collaboration wired.");
