@@ -8,6 +8,7 @@ import {
   JoinRoomPayload,
   isValidRoomId,
   isValidUserName,
+  isValidCoordinate,
   isValidHexColor,
   isValidStrokeWidth,
   isValidPointTuple,
@@ -130,8 +131,40 @@ io.on("connection", (socket) => {
     socket.to(room.id).emit("stroke:end", payload);
   });
 
+  // Ephemeral live cursor presence with rate limiting (~25 updates/sec)
+  const cursorRateLimit = new Map<string, number>();
+
+  socket.on("presence:cursor", (payload: any) => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    if (!payload || !isValidCoordinate(payload.worldX) || !isValidCoordinate(payload.worldY)) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastTime = cursorRateLimit.get(socket.id) || 0;
+    if (now - lastTime < 35) {
+      // Throttle excessive cursor events
+      return;
+    }
+    cursorRateLimit.set(socket.id, now);
+
+    const user = room.users.get(socket.id);
+    if (!user) return;
+
+    socket.to(room.id).emit("presence:cursor", {
+      userId: socket.id,
+      userName: user.name,
+      color: user.color,
+      worldX: payload.worldX,
+      worldY: payload.worldY
+    });
+  });
+
   // Disconnect handler
   socket.on("disconnect", () => {
+    cursorRateLimit.delete(socket.id);
     const { room, user } = roomManager.leaveRoom(socket.id);
     if (room && user) {
       socket.to(room.id).emit("presence:user-left", { userId: user.userId });

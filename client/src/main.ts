@@ -6,6 +6,7 @@ import { PerformanceHUD } from "./ui/performance-panel";
 import { setupKeyboardShortcuts } from "./ui/keyboard";
 import { showToast } from "./ui/toast";
 import { SocketClient } from "./collaboration/socket";
+import { PresenceManager } from "./collaboration/presence";
 import { FreehandStroke, ShapeStroke } from "./types";
 
 // Parse or generate room ID
@@ -20,14 +21,18 @@ if (!roomId) {
 
 const appEl = document.getElementById("app");
 const container = document.getElementById("canvas-container");
-if (!appEl || !container) {
-  throw new Error("Missing canvas container or app elements");
+const presenceLayer = document.getElementById("presence-layer");
+if (!appEl || !container || !presenceLayer) {
+  throw new Error("Missing required canvas or presence container elements");
 }
 
 // 1. Performance HUD
 export const perfHud = new PerformanceHUD();
 
-// 2. Canvas Engine with collaboration callbacks
+// 2. Presence Manager (Layer 3 DOM)
+export const presenceManager = new PresenceManager(presenceLayer);
+
+// 3. Canvas Engine with collaboration callbacks
 export const canvasEngine = new CanvasEngine(container, {
   onStrokeStart: (stroke) => {
     socketClient.emitStrokeStart(stroke);
@@ -37,19 +42,25 @@ export const canvasEngine = new CanvasEngine(container, {
   },
   onStrokeEnd: (stroke) => {
     socketClient.emitStrokeEnd(stroke.id);
+  },
+  onCursorMove: (worldPoint) => {
+    socketClient.emitCursor(worldPoint);
+  },
+  onViewportChange: (viewport) => {
+    presenceManager.positionAll(viewport);
   }
 });
 
-// 3. Top Bar
+// 4. Top Bar
 export const topBar = new TopBar(appEl, roomId, "Design Sprint", (newName) => {
   document.title = `CanvasFlow - ${newName}`;
   showToast(`Room renamed to "${newName}"`);
 });
 
-// 4. Vertical Toolbar + Properties Panel
+// 5. Vertical Toolbar + Properties Panel
 export const toolbar = new Toolbar(container, canvasEngine);
 
-// 5. Bottom Controls Bar
+// 6. Bottom Controls Bar
 export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   onUndo: () => {
     console.log("[CanvasFlow] Undo requested");
@@ -68,7 +79,7 @@ export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   }
 });
 
-// 6. Socket Collaboration Client
+// 7. Socket Collaboration Client
 export const socketClient = new SocketClient(roomId, {
   onStatusChange: (status) => {
     topBar.setConnectionStatus(status);
@@ -107,7 +118,8 @@ export const socketClient = new SocketClient(roomId, {
     );
     perfHud.setUsersCount(all.length);
   },
-  onUserLeft: (_userId) => {
+  onUserLeft: (userId) => {
+    presenceManager.removeCursor(userId);
     const all = socketClient.getParticipantsList();
     topBar.updateParticipants(
       all.map((p) => ({
@@ -118,6 +130,16 @@ export const socketClient = new SocketClient(roomId, {
       }))
     );
     perfHud.setUsersCount(all.length);
+  },
+  onRemoteCursor: (payload) => {
+    presenceManager.updateCursor(
+      payload.userId,
+      payload.userName,
+      payload.color,
+      payload.worldX,
+      payload.worldY,
+      canvasEngine.viewport
+    );
   },
   onRemoteStrokeStart: (payload) => {
     const startPoint = { x: payload.point[0], y: payload.point[1] };
@@ -176,7 +198,7 @@ export const socketClient = new SocketClient(roomId, {
   }
 });
 
-// 7. Keyboard Shortcuts
+// 8. Keyboard Shortcuts
 setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   onUndo: () => console.log("[CanvasFlow] Undo requested"),
   onRedo: () => console.log("[CanvasFlow] Redo requested")
@@ -190,6 +212,7 @@ setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   bottomBar: BottomBar;
   perfHud: PerformanceHUD;
   socketClient: SocketClient;
-}).socketClient = socketClient;
+  presenceManager: PresenceManager;
+}).presenceManager = presenceManager;
 
-console.log("[CanvasFlow] Real-time stroke collaboration wired.");
+console.log("[CanvasFlow] Live collaborator cursors wired.");

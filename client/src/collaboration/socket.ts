@@ -20,6 +20,7 @@ export interface SocketClientCallbacks {
   onRemoteStrokeStart?: (payload: StrokeStartPayload) => void;
   onRemoteStrokePoints?: (payload: StrokePointsPayload) => void;
   onRemoteStrokeEnd?: (payload: StrokeEndPayload) => void;
+  onRemoteCursor?: (payload: { userId: string; userName: string; color: string; worldX: number; worldY: number }) => void;
   onError?: (err: string) => void;
   onMessageReceived?: () => void;
 }
@@ -112,6 +113,11 @@ export class SocketClient {
       this.callbacks.onRemoteStrokeEnd?.(payload);
     });
 
+    this.socket.on("presence:cursor", (payload: any) => {
+      this.callbacks.onMessageReceived?.();
+      this.callbacks.onRemoteCursor?.(payload);
+    });
+
     this.socket.on("connection:pong", (payload: PongPayload) => {
       this.callbacks.onMessageReceived?.();
       const latency = Math.max(0, Date.now() - payload.clientTime);
@@ -188,6 +194,20 @@ export class SocketClient {
 
     const payload: StrokeEndPayload = { strokeId };
     this.socket.emit("stroke:end", payload);
+  }
+
+  private lastCursorEmit: number = 0;
+  public emitCursor(worldPoint: Point): void {
+    const now = Date.now();
+    if (now - this.lastCursorEmit < 35) return;
+    this.lastCursorEmit = now;
+
+    if (this.socket.connected) {
+      this.socket.emit("presence:cursor", {
+        worldX: Math.round(worldPoint.x * 10) / 10,
+        worldY: Math.round(worldPoint.y * 10) / 10
+      });
+    }
   }
 
   private startPing(): void {
