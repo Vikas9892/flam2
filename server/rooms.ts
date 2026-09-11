@@ -1,4 +1,5 @@
 import { UserInfo } from "./protocol.js";
+import { RoomHistory } from "./history.js";
 
 const USER_COLORS = [
   "#6366f1", // Indigo
@@ -19,6 +20,7 @@ export class Room {
   public id: string;
   public users: Map<string, UserInfo> = new Map();
   public revision: number = 0;
+  public history: RoomHistory = new RoomHistory();
   public cleanupTimer: NodeJS.Timeout | null = null;
   private colorIndex: number = 0;
 

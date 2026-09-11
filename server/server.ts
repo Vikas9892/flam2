@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
 import { roomManager } from "./rooms.js";
+import { validateStrokePayload } from "./drawing-state.js";
 import {
   JoinRoomPayload,
   isValidRoomId,
@@ -77,7 +78,8 @@ io.on("connection", (socket) => {
       roomId: room.id,
       self: user,
       participants: room.getParticipants(),
-      revision: room.revision
+      revision: room.revision,
+      operations: room.history.getOperations()
     });
 
     // Broadcast presence update to other peers in the room
@@ -129,6 +131,33 @@ io.on("connection", (socket) => {
     }
 
     socket.to(room.id).emit("stroke:end", payload);
+  });
+
+  // Authoritative operation commit
+  socket.on("operation:commit-stroke", (payload: any) => {
+    const room = roomManager.getRoomForUser(socket.id);
+    if (!room) return;
+
+    if (!payload || !validateStrokePayload(payload.stroke)) {
+      return;
+    }
+
+    room.revision++;
+    const operation: any = {
+      id: typeof payload.operationId === "string" && payload.operationId.length > 0
+        ? payload.operationId
+        : "op_" + Math.random().toString(36).substring(2, 9),
+      revision: room.revision,
+      authorId: socket.id,
+      type: "stroke",
+      payload: payload.stroke,
+      timestamp: Date.now()
+    };
+
+    room.history.addOperation(operation);
+
+    // Broadcast committed operation to all room sockets (including author to confirm revision)
+    io.to(room.id).emit("operation:commit", { operation });
   });
 
   // Ephemeral live cursor presence with rate limiting (~25 updates/sec)

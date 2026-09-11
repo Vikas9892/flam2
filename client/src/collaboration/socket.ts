@@ -21,6 +21,7 @@ export interface SocketClientCallbacks {
   onRemoteStrokePoints?: (payload: StrokePointsPayload) => void;
   onRemoteStrokeEnd?: (payload: StrokeEndPayload) => void;
   onRemoteCursor?: (payload: { userId: string; userName: string; color: string; worldX: number; worldY: number }) => void;
+  onOperationCommit?: (operation: any) => void;
   onError?: (err: string) => void;
   onMessageReceived?: () => void;
 }
@@ -118,6 +119,13 @@ export class SocketClient {
       this.callbacks.onRemoteCursor?.(payload);
     });
 
+    this.socket.on("operation:commit", (payload: any) => {
+      this.callbacks.onMessageReceived?.();
+      if (payload?.operation) {
+        this.callbacks.onOperationCommit?.(payload.operation);
+      }
+    });
+
     this.socket.on("connection:pong", (payload: PongPayload) => {
       this.callbacks.onMessageReceived?.();
       const latency = Math.max(0, Date.now() - payload.clientTime);
@@ -206,6 +214,15 @@ export class SocketClient {
       this.socket.emit("presence:cursor", {
         worldX: Math.round(worldPoint.x * 10) / 10,
         worldY: Math.round(worldPoint.y * 10) / 10
+      });
+    }
+  }
+
+  public commitStroke(operationId: string, stroke: DrawingStroke): void {
+    if (this.socket.connected) {
+      this.socket.emit("operation:commit-stroke", {
+        operationId,
+        stroke
       });
     }
   }

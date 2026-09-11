@@ -7,6 +7,7 @@ import { setupKeyboardShortcuts } from "./ui/keyboard";
 import { showToast } from "./ui/toast";
 import { SocketClient } from "./collaboration/socket";
 import { PresenceManager } from "./collaboration/presence";
+import { ClientHistory } from "./state/history";
 import { FreehandStroke, ShapeStroke } from "./types";
 
 // Parse or generate room ID
@@ -29,10 +30,13 @@ if (!appEl || !container || !presenceLayer) {
 // 1. Performance HUD
 export const perfHud = new PerformanceHUD();
 
-// 2. Presence Manager (Layer 3 DOM)
+// 2. Client History Manager (canonical append-only operation log)
+export const clientHistory = new ClientHistory();
+
+// 3. Presence Manager (Layer 3 DOM)
 export const presenceManager = new PresenceManager(presenceLayer);
 
-// 3. Canvas Engine with collaboration callbacks
+// 4. Canvas Engine with collaboration callbacks
 export const canvasEngine = new CanvasEngine(container, {
   onStrokeStart: (stroke) => {
     socketClient.emitStrokeStart(stroke);
@@ -41,6 +45,7 @@ export const canvasEngine = new CanvasEngine(container, {
     socketClient.emitStrokePoints(strokeId, points);
   },
   onStrokeEnd: (stroke) => {
+    socketClient.commitStroke(stroke.id, stroke);
     socketClient.emitStrokeEnd(stroke.id);
   },
   onCursorMove: (worldPoint) => {
@@ -51,16 +56,16 @@ export const canvasEngine = new CanvasEngine(container, {
   }
 });
 
-// 4. Top Bar
+// 5. Top Bar
 export const topBar = new TopBar(appEl, roomId, "Design Sprint", (newName) => {
   document.title = `CanvasFlow - ${newName}`;
   showToast(`Room renamed to "${newName}"`);
 });
 
-// 5. Vertical Toolbar + Properties Panel
+// 6. Vertical Toolbar + Properties Panel
 export const toolbar = new Toolbar(container, canvasEngine);
 
-// 6. Bottom Controls Bar
+// 7. Bottom Controls Bar
 export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   onUndo: () => {
     console.log("[CanvasFlow] Undo requested");
@@ -79,7 +84,7 @@ export const bottomBar = new BottomBar(appEl, canvasEngine, perfHud, {
   }
 });
 
-// 7. Socket Collaboration Client
+// 8. Socket Collaboration Client
 export const socketClient = new SocketClient(roomId, {
   onStatusChange: (status) => {
     topBar.setConnectionStatus(status);
@@ -98,6 +103,14 @@ export const socketClient = new SocketClient(roomId, {
       }))
     );
     perfHud.setUsersCount(state.participants.length);
+
+    // Synchronize history and active strokes
+    if (Array.isArray(state.operations)) {
+      clientHistory.setOperations(state.operations);
+      canvasEngine.setCommittedStrokes(clientHistory.getActiveStrokes());
+      perfHud.setOpsCount(clientHistory.getAllOperations().length);
+      bottomBar.setHistoryState(clientHistory.canUndo(), clientHistory.canRedo());
+    }
 
     // Adopt assigned color for local user
     if (state.self.color) {
@@ -184,11 +197,13 @@ export const socketClient = new SocketClient(roomId, {
     }
   },
   onRemoteStrokeEnd: (payload) => {
-    const existing = canvasEngine.getRemoteActiveStroke(payload.strokeId);
-    if (existing) {
-      canvasEngine.removeRemoteActiveStroke(payload.strokeId);
-      canvasEngine.commitStroke(existing);
-    }
+    canvasEngine.removeRemoteActiveStroke(payload.strokeId);
+  },
+  onOperationCommit: (operation) => {
+    clientHistory.applyOperation(operation);
+    canvasEngine.setCommittedStrokes(clientHistory.getActiveStrokes());
+    perfHud.setOpsCount(clientHistory.getAllOperations().length);
+    bottomBar.setHistoryState(clientHistory.canUndo(), clientHistory.canRedo());
   },
   onError: (msg) => {
     showToast(`Error: ${msg}`);
@@ -198,7 +213,7 @@ export const socketClient = new SocketClient(roomId, {
   }
 });
 
-// 8. Keyboard Shortcuts
+// 9. Keyboard Shortcuts
 setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   onUndo: () => console.log("[CanvasFlow] Undo requested"),
   onRedo: () => console.log("[CanvasFlow] Redo requested")
@@ -213,6 +228,7 @@ setupKeyboardShortcuts(toolbar, bottomBar, canvasEngine, {
   perfHud: PerformanceHUD;
   socketClient: SocketClient;
   presenceManager: PresenceManager;
-}).presenceManager = presenceManager;
+  clientHistory: ClientHistory;
+}).clientHistory = clientHistory;
 
-console.log("[CanvasFlow] Live collaborator cursors wired.");
+console.log("[CanvasFlow] Server operation history wired.");
