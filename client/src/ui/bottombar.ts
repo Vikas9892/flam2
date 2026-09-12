@@ -33,11 +33,11 @@ export class BottomBar {
     this.el.innerHTML = `
       <!-- History Group -->
       <div class="bottom-group">
-        <button class="bottom-btn" id="btn-undo" title="Undo [Ctrl+Z]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        <button class="bottom-btn" id="btn-undo" title="Undo [Ctrl+Z]" aria-label="Undo action [Ctrl+Z]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
-        <button class="bottom-btn" id="btn-redo" title="Redo [Ctrl+Y]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+        <button class="bottom-btn" id="btn-redo" title="Redo [Ctrl+Y]" aria-label="Redo action [Ctrl+Y]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
         </button>
       </div>
 
@@ -45,12 +45,12 @@ export class BottomBar {
 
       <!-- Zoom Group -->
       <div class="bottom-group">
-        <button class="bottom-btn" id="btn-zoom-out" title="Zoom Out [-]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <button class="bottom-btn" id="btn-zoom-out" title="Zoom Out [-]" aria-label="Zoom Out [-]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
-        <span class="zoom-indicator" id="zoom-indicator" title="Click to reset zoom [0]">100%</span>
-        <button class="bottom-btn" id="btn-zoom-in" title="Zoom In [=]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span class="zoom-indicator" id="zoom-indicator" title="Click to reset zoom [0]" aria-label="Reset zoom [0]">100%</span>
+        <button class="bottom-btn" id="btn-zoom-in" title="Zoom In [=]" aria-label="Zoom In [=]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>
 
@@ -58,12 +58,12 @@ export class BottomBar {
 
       <!-- Actions Group -->
       <div class="bottom-group">
-        <button class="bottom-btn" id="btn-export" title="Export as PNG">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <button class="bottom-btn" id="btn-export" title="Export as PNG" aria-label="Export canvas as PNG">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Export</span>
         </button>
-        <button class="bottom-btn" id="btn-clear" title="Clear Canvas">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <button class="bottom-btn" id="btn-clear" title="Clear Canvas" aria-label="Clear all canvas drawings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           <span>Clear</span>
         </button>
       </div>
@@ -72,7 +72,7 @@ export class BottomBar {
 
       <!-- Performance Toggle -->
       <div class="bottom-group">
-        <button class="bottom-btn" id="btn-perf-toggle" title="Toggle Performance HUD">
+        <button class="bottom-btn" id="btn-perf-toggle" title="Toggle Performance HUD" aria-label="Toggle Performance HUD">
           <span>⌁ Perf</span>
         </button>
       </div>

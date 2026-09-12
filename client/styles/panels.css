@@ -410,6 +410,58 @@
   margin-left: -4px;
 }
 
+/* Local Tool Size Indicator Cursor on Presence Layer */
+.local-tool-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform, width, height;
+  display: none;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+/* BRUSH CURSOR: Crisp high-contrast circular outline with colored center dot */
+.local-tool-cursor.tool-brush {
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  background-color: transparent;
+}
+
+.local-tool-cursor.tool-brush .cursor-center-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--cursor-color, #818cf8);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+/* ERASER CURSOR: Segmented dashed border with soft white fill and red center indicator */
+.local-tool-cursor.tool-eraser {
+  border: 2px dashed #ffffff;
+  background-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 0 6px rgba(0, 0, 0, 0.25);
+}
+
+.local-tool-cursor.tool-eraser .cursor-center-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #ef4444;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
 /* Responsive adjustments for mobile screens */
 @media (max-width: 768px) {
   .floating-toolbar {

@@ -21,33 +21,33 @@ export class Toolbar {
     this.el = document.createElement("div");
     this.el.className = "floating-toolbar";
     this.el.innerHTML = `
-      <button class="tool-button" data-tool="hand" title="Hand (Pan) [H]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8M6 14v-2a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6a7 7 0 0 0 7 7h4a7 7 0 0 0 7-7v-6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v3"/></svg>
+      <button class="tool-button" data-tool="hand" title="Hand (Pan) [H]" aria-label="Hand / Pan tool [H]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M6 14v-2a2 2 0 0 0-4 0v6a7 7 0 0 0 7 7h4a7 7 0 0 0 7-7v-6a2 2 0 0 0-4 0v3"/></svg>
         <span class="tooltip">Hand / Pan [H]</span>
       </button>
 
-      <button class="tool-button active" data-tool="brush" title="Brush [B]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/><path d="M18 8l-3-3"/><path d="M2 22s3-1 4-4c1-3 0-6 0-6l-3 3s-2 3-1 7Z"/></svg>
+      <button class="tool-button active" data-tool="brush" title="Brush [B]" aria-label="Brush / Draw tool [B]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18.37 2.63 3 3L7.5 19.5 2 21l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
         <span class="tooltip">Brush [B]</span>
       </button>
 
-      <button class="tool-button" data-tool="eraser" title="Eraser [E]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+      <button class="tool-button" data-tool="eraser" title="Eraser [E]" aria-label="Eraser tool [E]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4.93 19.07 4.24 4.24a1.5 1.5 0 0 0 2.12 0l10.6-10.6a1.5 1.5 0 0 0 0-2.12l-4.24-4.24a1.5 1.5 0 0 0-2.12 0L4.93 16.95a1.5 1.5 0 0 0 0 2.12z"/><path d="m14.83 9.17 4.24 4.24"/><line x1="2" y1="22" x2="22" y2="22"/></svg>
         <span class="tooltip">Eraser [E]</span>
       </button>
 
-      <button class="tool-button" data-tool="line" title="Line [L]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+      <button class="tool-button" data-tool="line" title="Line [L]" aria-label="Line tool [L]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="19" x2="19" y2="5"/></svg>
         <span class="tooltip">Line [L]</span>
       </button>
 
-      <button class="tool-button" data-tool="rectangle" title="Rectangle [R]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+      <button class="tool-button" data-tool="rectangle" title="Rectangle [R]" aria-label="Rectangle tool [R]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
         <span class="tooltip">Rectangle [R]</span>
       </button>
 
-      <button class="tool-button" data-tool="circle" title="Circle [C]">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/></svg>
+      <button class="tool-button" data-tool="circle" title="Circle [C]" aria-label="Circle tool [C]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
         <span class="tooltip">Circle [C]</span>
       </button>
     `;
@@ -78,7 +78,7 @@ export class Toolbar {
     });
 
     this.propertiesPanel.innerHTML = `
-      <div>
+      <div id="color-section">
         <div class="panel-section-title" style="margin-bottom: 8px;">Stroke Color</div>
         <div class="color-swatches-grid" id="color-grid">${swatchesHtml}</div>
         <div class="custom-color-row">
@@ -87,11 +87,11 @@ export class Toolbar {
         </div>
       </div>
 
-      <div>
-        <div class="panel-section-title" style="margin-bottom: 8px;">Stroke Width</div>
+      <div id="width-section">
+        <div class="panel-section-title" id="width-section-title" style="margin-bottom: 8px;">Stroke Width</div>
         <div class="stroke-width-presets" id="width-presets">${widthsHtml}</div>
         <div class="stroke-width-slider-row" style="margin-top: 8px;">
-          <input type="range" class="stroke-width-slider" id="stroke-slider" min="1" max="40" value="${this.canvasEngine.currentStyle.width}" />
+          <input type="range" class="stroke-width-slider" id="stroke-slider" min="2" max="60" value="${this.canvasEngine.currentStyle.width}" />
           <span class="stroke-width-value" id="stroke-val">${this.canvasEngine.currentStyle.width}px</span>
         </div>
       </div>
@@ -145,11 +145,20 @@ export class Toolbar {
     const btn = this.el.querySelector(`[data-tool="${tool}"]`);
     if (btn) btn.classList.add("active");
 
-    // Show/hide properties panel depending on tool (eraser or hand don't need color)
+    const colorSection = this.propertiesPanel.querySelector<HTMLElement>("#color-section");
+    const widthTitle = this.propertiesPanel.querySelector<HTMLElement>("#width-section-title");
+
+    // Show/hide properties panel depending on tool
     if (tool === "hand") {
       this.propertiesPanel.style.display = "none";
+    } else if (tool === "eraser") {
+      this.propertiesPanel.style.display = "flex";
+      if (colorSection) colorSection.style.display = "none";
+      if (widthTitle) widthTitle.textContent = "Eraser Size";
     } else {
       this.propertiesPanel.style.display = "flex";
+      if (colorSection) colorSection.style.display = "block";
+      if (widthTitle) widthTitle.textContent = "Stroke Width";
     }
   }
 

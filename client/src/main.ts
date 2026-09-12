@@ -38,24 +38,28 @@ export const clientHistory = new ClientHistory();
 export const presenceManager = new PresenceManager(presenceLayer);
 
 // 4. Canvas Engine with collaboration callbacks
-export const canvasEngine = new CanvasEngine(container, {
-  onStrokeStart: (stroke) => {
-    socketClient.emitStrokeStart(stroke);
+export const canvasEngine = new CanvasEngine(
+  container,
+  {
+    onStrokeStart: (stroke) => {
+      socketClient.emitStrokeStart(stroke);
+    },
+    onStrokePoints: (strokeId, points) => {
+      socketClient.emitStrokePoints(strokeId, points);
+    },
+    onStrokeEnd: (stroke) => {
+      socketClient.commitStroke(stroke.id, stroke);
+      socketClient.emitStrokeEnd(stroke.id);
+    },
+    onCursorMove: (worldPoint) => {
+      socketClient.emitCursor(worldPoint);
+    },
+    onViewportChange: (viewport) => {
+      presenceManager.positionAll(viewport);
+    }
   },
-  onStrokePoints: (strokeId, points) => {
-    socketClient.emitStrokePoints(strokeId, points);
-  },
-  onStrokeEnd: (stroke) => {
-    socketClient.commitStroke(stroke.id, stroke);
-    socketClient.emitStrokeEnd(stroke.id);
-  },
-  onCursorMove: (worldPoint) => {
-    socketClient.emitCursor(worldPoint);
-  },
-  onViewportChange: (viewport) => {
-    presenceManager.positionAll(viewport);
-  }
-});
+  presenceLayer
+);
 
 // 5. Top Bar
 export const topBar = new TopBar(appEl, roomId, "Design Sprint", (newName) => {
@@ -188,6 +192,9 @@ export const socketClient = new SocketClient(roomId, {
         style: { color: payload.color, width: payload.width },
         points: [startPoint]
       };
+      if (payload.tool === "eraser") {
+        canvasEngine.erasePointOnCommitted(startPoint, payload.width);
+      }
       canvasEngine.updateRemoteActiveStroke(stroke);
     } else {
       const stroke: ShapeStroke = {
@@ -208,7 +215,12 @@ export const socketClient = new SocketClient(roomId, {
     if (existing.tool === "brush" || existing.tool === "eraser") {
       const freehand = existing as FreehandStroke;
       payload.points.forEach((pt) => {
-        freehand.points.push({ x: pt[0], y: pt[1] });
+        const nextPoint = { x: pt[0], y: pt[1] };
+        const prevPoint = freehand.points[freehand.points.length - 1];
+        if (freehand.tool === "eraser" && prevPoint) {
+          canvasEngine.eraseSegmentOnCommitted(prevPoint, nextPoint, freehand.style.width);
+        }
+        freehand.points.push(nextPoint);
       });
       canvasEngine.updateRemoteActiveStroke(freehand);
     } else {

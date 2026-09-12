@@ -13,6 +13,7 @@ export interface CanvasCallbacks {
 
 export class CanvasEngine {
   public container: HTMLElement;
+  public presenceLayer: HTMLElement | null = null;
   public committedCanvas: HTMLCanvasElement;
   public activeCanvas: HTMLCanvasElement;
   public committedCtx: CanvasRenderingContext2D;
@@ -24,6 +25,11 @@ export class CanvasEngine {
     color: "#818cf8",
     width: 4
   };
+
+  // Tool cursor indicator
+  private toolCursorEl: HTMLElement | null = null;
+  private lastScreenPoint: Point = { x: -9999, y: -9999 };
+  private isPointerInside: boolean = false;
 
   // State
   private isDrawing: boolean = false;
@@ -39,8 +45,13 @@ export class CanvasEngine {
   // Render loop flag
   private activeRenderPending: boolean = false;
 
-  constructor(container: HTMLElement, callbacks: CanvasCallbacks = {}) {
+  constructor(
+    container: HTMLElement,
+    callbacks: CanvasCallbacks = {},
+    presenceLayer?: HTMLElement | null
+  ) {
     this.container = container;
+    this.presenceLayer = presenceLayer || container.querySelector("#presence-layer") || null;
     this.callbacks = callbacks;
     this.viewport = new Viewport();
 
@@ -65,8 +76,49 @@ export class CanvasEngine {
     this.committedCtx = cCtx;
     this.activeCtx = aCtx;
 
+    this.initToolCursor();
     this.setupResizeObserver();
     this.bindEvents();
+    this.updateToolCursor();
+  }
+
+  private initToolCursor(): void {
+    if (!this.presenceLayer) return;
+    this.toolCursorEl = document.createElement("div");
+    this.toolCursorEl.className = "local-tool-cursor";
+    this.toolCursorEl.id = "local-tool-cursor";
+
+    const dot = document.createElement("div");
+    dot.className = "cursor-center-dot";
+    this.toolCursorEl.appendChild(dot);
+
+    this.presenceLayer.appendChild(this.toolCursorEl);
+  }
+
+  public updateToolCursor(): void {
+    if (!this.toolCursorEl) return;
+
+    if ((this.activeTool === "brush" || this.activeTool === "eraser") && this.isPointerInside) {
+      this.toolCursorEl.style.display = "block";
+      this.toolCursorEl.className = `local-tool-cursor tool-${this.activeTool}`;
+
+      // Screen diameter = width * zoom CSS pixels (independent of DPR)
+      const diameter = Math.max(4, Math.round(this.currentStyle.width * this.viewport.zoom));
+      this.toolCursorEl.style.width = `${diameter}px`;
+      this.toolCursorEl.style.height = `${diameter}px`;
+      this.toolCursorEl.style.setProperty("--cursor-color", this.currentStyle.color);
+
+      const radius = diameter / 2;
+      this.toolCursorEl.style.transform = `translate3d(${this.lastScreenPoint.x - radius}px, ${this.lastScreenPoint.y - radius}px, 0)`;
+      this.activeCanvas.style.cursor = "none";
+    } else {
+      this.toolCursorEl.style.display = "none";
+      if (this.activeTool === "hand") {
+        this.activeCanvas.style.cursor = this.isPanning ? "grabbing" : "grab";
+      } else {
+        this.activeCanvas.style.cursor = "crosshair";
+      }
+    }
   }
 
   private setupResizeObserver(): void {
@@ -101,6 +153,7 @@ export class CanvasEngine {
 
     this.redrawCommitted();
     this.requestActiveRender();
+    this.updateToolCursor();
   }
 
   private bindEvents(): void {
@@ -109,6 +162,18 @@ export class CanvasEngine {
     this.activeCanvas.addEventListener("pointermove", (e) => this.onPointerMove(e));
     this.activeCanvas.addEventListener("pointerup", (e) => this.onPointerUp(e));
     this.activeCanvas.addEventListener("pointercancel", (e) => this.onPointerCancel(e));
+
+    this.activeCanvas.addEventListener("pointerenter", () => {
+      this.isPointerInside = true;
+      this.updateToolCursor();
+    });
+
+    this.activeCanvas.addEventListener("pointerleave", () => {
+      if (!this.isDrawing) {
+        this.isPointerInside = false;
+        this.updateToolCursor();
+      }
+    });
 
     // Wheel for pan and zoom
     this.activeCanvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
@@ -122,6 +187,33 @@ export class CanvasEngine {
     };
   }
 
+  // Live eraser helpers on Layer 1 (Committed Canvas)
+  public erasePointOnCommitted(point: Point, width: number): void {
+    this.viewport.applyTransform(this.committedCtx);
+    this.committedCtx.save();
+    this.committedCtx.globalCompositeOperation = "destination-out";
+    this.committedCtx.fillStyle = "rgba(0,0,0,1)";
+    this.committedCtx.beginPath();
+    this.committedCtx.arc(point.x, point.y, width / 2, 0, Math.PI * 2);
+    this.committedCtx.fill();
+    this.committedCtx.restore();
+  }
+
+  public eraseSegmentOnCommitted(p1: Point, p2: Point, width: number): void {
+    this.viewport.applyTransform(this.committedCtx);
+    this.committedCtx.save();
+    this.committedCtx.lineCap = "round";
+    this.committedCtx.lineJoin = "round";
+    this.committedCtx.lineWidth = width;
+    this.committedCtx.globalCompositeOperation = "destination-out";
+    this.committedCtx.strokeStyle = "rgba(0,0,0,1)";
+    this.committedCtx.beginPath();
+    this.committedCtx.moveTo(p1.x, p1.y);
+    this.committedCtx.lineTo(p2.x, p2.y);
+    this.committedCtx.stroke();
+    this.committedCtx.restore();
+  }
+
   private onPointerDown(e: PointerEvent): void {
     // Only handle primary button or middle button (for panning)
     if (e.button !== 0 && e.button !== 1) return;
@@ -129,6 +221,9 @@ export class CanvasEngine {
     this.activeCanvas.setPointerCapture(e.pointerId);
     const screenPoint = this.getScreenPoint(e);
     const worldPoint = this.viewport.screenToWorld(screenPoint);
+    this.lastScreenPoint = screenPoint;
+    this.isPointerInside = true;
+    this.updateToolCursor();
 
     if (this.activeTool === "hand" || e.button === 1 || e.spaceKey) {
       this.isPanning = true;
@@ -149,6 +244,12 @@ export class CanvasEngine {
         points: [worldPoint]
       };
       this.localStroke = stroke;
+
+      // Immediate local live erase on pointerdown
+      if (this.activeTool === "eraser") {
+        this.erasePointOnCommitted(worldPoint, stroke.style.width);
+      }
+
       if (this.callbacks.onStrokeStart) {
         this.callbacks.onStrokeStart(stroke);
       }
@@ -177,6 +278,9 @@ export class CanvasEngine {
   private onPointerMove(e: PointerEvent): void {
     const screenPoint = this.getScreenPoint(e);
     const worldPoint = this.viewport.screenToWorld(screenPoint);
+    this.lastScreenPoint = screenPoint;
+    this.isPointerInside = true;
+    this.updateToolCursor();
 
     if (this.callbacks.onCursorMove) {
       this.callbacks.onCursorMove(worldPoint);
@@ -199,7 +303,14 @@ export class CanvasEngine {
 
     if (this.localStroke.tool === "brush" || this.localStroke.tool === "eraser") {
       const freehand = this.localStroke as FreehandStroke;
+      const prevPoint = freehand.points[freehand.points.length - 1];
       freehand.points.push(worldPoint);
+
+      // Continuous live erase segment while mouse button is held
+      if (this.localStroke.tool === "eraser" && prevPoint) {
+        this.eraseSegmentOnCommitted(prevPoint, worldPoint, freehand.style.width);
+      }
+
       if (this.callbacks.onStrokePoints) {
         this.callbacks.onStrokePoints(freehand.id, [worldPoint]);
       }
@@ -222,6 +333,7 @@ export class CanvasEngine {
     if (this.isPanning) {
       this.isPanning = false;
       this.container.style.cursor = this.activeTool === "hand" ? "grab" : "default";
+      this.updateToolCursor();
       return;
     }
 
@@ -239,16 +351,26 @@ export class CanvasEngine {
     }
 
     this.requestActiveRender();
+    this.updateToolCursor();
   }
 
   private onPointerCancel(e: PointerEvent): void {
     if (this.activeCanvas.hasPointerCapture(e.pointerId)) {
       this.activeCanvas.releasePointerCapture(e.pointerId);
     }
+    const wasDrawing = this.isDrawing;
+    const wasEraser = this.localStroke?.tool === "eraser";
     this.isDrawing = false;
     this.isPanning = false;
     this.localStroke = null;
+
+    if (wasDrawing && wasEraser) {
+      // Revert committed canvas since uncommitted erase was cancelled
+      this.redrawCommitted();
+    }
+
     this.requestActiveRender();
+    this.updateToolCursor();
   }
 
   private onWheel(e: WheelEvent): void {
@@ -278,15 +400,17 @@ export class CanvasEngine {
 
   public setTool(tool: ToolType): void {
     this.activeTool = tool;
-    this.container.style.cursor = tool === "hand" ? "grab" : "crosshair";
+    this.updateToolCursor();
   }
 
   public setColor(color: string): void {
     this.currentStyle.color = color;
+    this.updateToolCursor();
   }
 
   public setStrokeWidth(width: number): void {
     this.currentStyle.width = width;
+    this.updateToolCursor();
   }
 
   public setZoom(zoom: number): void {
@@ -298,6 +422,7 @@ export class CanvasEngine {
     this.viewport.setZoom(zoom, center);
     this.redrawCommitted();
     this.requestActiveRender();
+    this.updateToolCursor();
     if (this.callbacks.onViewportChange) {
       this.callbacks.onViewportChange(this.viewport);
     }
@@ -307,6 +432,7 @@ export class CanvasEngine {
     this.viewport.reset();
     this.redrawCommitted();
     this.requestActiveRender();
+    this.updateToolCursor();
     if (this.callbacks.onViewportChange) {
       this.callbacks.onViewportChange(this.viewport);
     }
@@ -314,9 +440,13 @@ export class CanvasEngine {
 
   public commitStroke(stroke: DrawingStroke): void {
     this.committedStrokes.push(stroke);
-    // Render on Layer 1
-    this.viewport.applyTransform(this.committedCtx);
-    renderStroke(this.committedCtx, stroke);
+    if (stroke.tool === "eraser") {
+      // Re-render committed layer to ensure canonical smoothed bezier curve
+      this.redrawCommitted();
+    } else {
+      this.viewport.applyTransform(this.committedCtx);
+      renderStroke(this.committedCtx, stroke);
+    }
   }
 
   public setCommittedStrokes(strokes: DrawingStroke[]): void {
@@ -328,6 +458,16 @@ export class CanvasEngine {
     clearLayer(this.committedCanvas, this.committedCtx, this.viewport);
     for (const stroke of this.committedStrokes) {
       renderStroke(this.committedCtx, stroke);
+    }
+    // Re-apply live active local eraser if currently drawing with eraser
+    if (this.isDrawing && this.localStroke && this.localStroke.tool === "eraser") {
+      renderStroke(this.committedCtx, this.localStroke);
+    }
+    // Re-apply any remote active erasers
+    for (const remoteStroke of this.remoteActiveStrokes.values()) {
+      if (remoteStroke.tool === "eraser") {
+        renderStroke(this.committedCtx, remoteStroke);
+      }
     }
   }
 
@@ -367,13 +507,15 @@ export class CanvasEngine {
     const t0 = PerformanceProfiler.startMeasure();
     clearLayer(this.activeCanvas, this.activeCtx, this.viewport);
 
-    // Render remote in-flight strokes
+    // Render remote in-flight strokes (non-eraser strokes go on active layer)
     for (const remoteStroke of this.remoteActiveStrokes.values()) {
-      renderStroke(this.activeCtx, remoteStroke);
+      if (remoteStroke.tool !== "eraser") {
+        renderStroke(this.activeCtx, remoteStroke);
+      }
     }
 
-    // Render local in-flight stroke
-    if (this.localStroke) {
+    // Render local in-flight stroke (non-eraser strokes go on active layer)
+    if (this.localStroke && this.localStroke.tool !== "eraser") {
       renderStroke(this.activeCtx, this.localStroke);
     }
     PerformanceProfiler.endMeasure(t0, "active-canvas");
